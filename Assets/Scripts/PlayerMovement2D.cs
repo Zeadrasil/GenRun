@@ -8,11 +8,8 @@ using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 public class PlayerMovement2D : MonoBehaviour
 {
-    [SerializeField] private KeyCodeVariable left;
-    [SerializeField] private KeyCodeVariable right;
-    [SerializeField] private KeyCodeVariable jump;
-    [SerializeField] private KeyCodeVariable grapple;
     [SerializeField] private VoidEvent resetEvent;
+    [SerializeField] private int playerID = 0;
     private bool grappling = false;
     private float grappleCooldown = 0;
     private bool facingRight = true;
@@ -55,18 +52,18 @@ public class PlayerMovement2D : MonoBehaviour
                     jumpsRemaining = math.min(jumpsRemaining, 1);
                 }
             }
-            if (Input.GetKeyDown(grapple) && grappleCooldown <= 0)
+            if (InputManager.Instance.GetStartedGrapple(playerID) && grappleCooldown <= 0)
             {
                 initiateGrapple();
             }
-            if (Input.GetKeyUp(grapple) && grappling)
+            if (InputManager.Instance.GetEndedGrapple(playerID) && grappling)
             {
                 grappling = false;
                 jumped = false;
                 jumpsRemaining = math.max(jumpsRemaining, 1);
                 velocity = (RotateAround(grappleCenter, transform.position, facingRight ? -90 : 90) - transform.position).normalized * grappleVelocity;
             }
-            if (Input.GetKeyDown(jump) && jumpsRemaining > 0)
+            if (InputManager.Instance.GetStartedJump(playerID) && jumpsRemaining > 0)
             {
                 jumpsRemaining--;
                 float force = jumpsRemaining == 0 ? 10 : 15;
@@ -82,27 +79,15 @@ public class PlayerMovement2D : MonoBehaviour
                     velocity.y = velocity.y > 0 ? velocity.y + force : force;
                 }
             }
-            if (Input.GetKeyUp(jump) && !grappling && jumped)
+            if (InputManager.Instance.GetEndedJump(playerID) && !grappling && jumped)
             {
                 velocity.y *= velocity.y > 0 ? 0.5f : 1;
             }
             float modifier = 10 / (MathF.Abs(velocity.x) + 0.1f);
-            if (Input.GetKey(left) && !lockedOnWall)
+            if(InputManager.Instance.GetMovement(playerID) != 0 && !lockedOnWall)
             {
-                velocity.x -= 10 * modifier * Time.deltaTime;
-                if (Input.GetKey(right))
-                {
-                    velocity.x += 10 * modifier * Time.deltaTime;
-                }
-                else
-                {
-                    facingRight = false;
-                }
-            }
-            if (Input.GetKey(right) && !lockedOnWall)
-            {
-                velocity.x += 10 * modifier * Time.deltaTime;
-                facingRight = true;
+                velocity.x += 10 * modifier * Time.deltaTime * InputManager.Instance.GetMovement(playerID);
+                facingRight = InputManager.Instance.GetMovement(playerID) > 0;
             }
 
             float rate = onGround() ? 0.75f : 0.5f;
