@@ -6,12 +6,9 @@ using Unity.Mathematics;
 using Unity.VisualScripting;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
-public class PlayerMovement2D : MonoBehaviour
+using static UnityEngine.RuleTile.TilingRuleOutput;
+public class PlayerMovement2D : MonoBehaviour, IMovable
 {
-    [SerializeField] private KeyCodeVariable left;
-    [SerializeField] private KeyCodeVariable right;
-    [SerializeField] private KeyCodeVariable jump;
-    [SerializeField] private KeyCodeVariable grapple;
     [SerializeField] private VoidEvent resetEvent;
     private bool grappling = false;
     private float grappleCooldown = 0;
@@ -27,6 +24,8 @@ public class PlayerMovement2D : MonoBehaviour
     [SerializeField] float width = 0.5f;
     bool jumped = false;
     bool lockedOnWall = false;
+    bool movingRight = false;
+    bool movingLeft = false;
     // Start is called before the first frame update
     void Start()
     {
@@ -55,54 +54,11 @@ public class PlayerMovement2D : MonoBehaviour
                     jumpsRemaining = math.min(jumpsRemaining, 1);
                 }
             }
-            if (Input.GetKeyDown(grapple) && grappleCooldown <= 0)
-            {
-                initiateGrapple();
-            }
-            if (Input.GetKeyUp(grapple) && grappling)
-            {
-                grappling = false;
-                jumped = false;
-                jumpsRemaining = math.max(jumpsRemaining, 1);
-                velocity = (RotateAround(grappleCenter, transform.position, facingRight ? -90 : 90) - transform.position).normalized * grappleVelocity;
-            }
-            if (Input.GetKeyDown(jump) && jumpsRemaining > 0)
-            {
-                jumpsRemaining--;
-                float force = jumpsRemaining == 0 ? 10 : 15;
-                if (lockedOnWall)
-                {
-                    float x = OnWall() < 3 ? 1 : -1;
-                    velocity.y = math.max(velocity.y, 0);
-                    velocity += new Vector3(x, 1).normalized * force;
-                    lockedOnWall = false;
-                }
-                else
-                {
-                    velocity.y = velocity.y > 0 ? velocity.y + force : force;
-                }
-            }
-            if (Input.GetKeyUp(jump) && !grappling && jumped)
-            {
-                velocity.y *= velocity.y > 0 ? 0.5f : 1;
-            }
             float modifier = 10 / (MathF.Abs(velocity.x) + 0.1f);
-            if (Input.GetKey(left) && !lockedOnWall)
+            if((movingLeft ^ movingRight) && !lockedOnWall)
             {
-                velocity.x -= 10 * modifier * Time.deltaTime;
-                if (Input.GetKey(right))
-                {
-                    velocity.x += 10 * modifier * Time.deltaTime;
-                }
-                else
-                {
-                    facingRight = false;
-                }
-            }
-            if (Input.GetKey(right) && !lockedOnWall)
-            {
-                velocity.x += 10 * modifier * Time.deltaTime;
-                facingRight = true;
+                velocity.x += 10 * modifier * Time.deltaTime * (movingRight ? 1 : -1);
+                facingRight = movingRight;
             }
 
             float rate = onGround() ? 0.75f : 0.5f;
@@ -112,30 +68,6 @@ public class PlayerMovement2D : MonoBehaviour
             velocity.x -= velocity.x > 0 ? ((velocity.x + 10) * rate * Time.deltaTime) - 10 * rate * Time.deltaTime : ((velocity.x - 10) * rate * Time.deltaTime) + 10 * rate * Time.deltaTime;
             RunMovement(velocity.magnitude * Time.deltaTime);
             lastPosition = transform.position;
-        }
-    }
-    private void initiateGrapple()
-    {
-        lockedOnWall = false;
-        grappleCooldown = 0.25f;
-        RaycastHit2D hit = Physics2D.Raycast(transform.position + (new Vector3(facingRight ? 1 : -1, 1, 0)), new Vector2(facingRight ? 1 : -1, 1));
-        if (hit.collider != null && hit.collider.gameObject.layer == LayerMask.NameToLayer("Grapple"))
-        {
-            drawLine(transform.position, hit.point, Color.green, Color.green, 5);
-            grappling = true;
-            grappleCenter = hit.point;
-            grappleVelocity = velocity.magnitude;
-            Vector3 perp = Vector3.Cross(grappleCenter - transform.position, Vector3.forward) * (facingRight ? 1 : -1);
-            transform.rotation = Quaternion.Euler(new Vector3(0, 0, MathF.Atan2(perp.x, perp.y)));
-
-        }
-        else if (hit.collider != null && hit.collider.gameObject.layer != LayerMask.NameToLayer("Grapple"))
-        {
-            drawLine(transform.position, hit.point, Color.yellow, Color.yellow, 5);
-        }
-        else
-        {
-            drawLine(transform.position, transform.position + new Vector3(facingRight ? 1 : -1, 1, 0) * 1000, Color.red,Color.red, 5);
         }
     }
 
@@ -260,5 +192,92 @@ public class PlayerMovement2D : MonoBehaviour
         Vector3 nextPosition = new Vector3(originalPosition.x * MathF.Cos(angle) - originalPosition.y * MathF.Sin(angle), originalPosition.x * Mathf.Sin(angle) + originalPosition.y * MathF.Cos(angle));
         nextPosition += center;
         return nextPosition;
+    }
+
+    public void ProcessBeginJump()
+    {
+        if (jumpsRemaining > 0)
+        {
+            jumpsRemaining--;
+            float force = jumpsRemaining == 0 ? 10 : 15;
+            if (lockedOnWall)
+            {
+                float x = OnWall() < 3 ? 1 : -1;
+                velocity.y = math.max(velocity.y, 0);
+                velocity += new Vector3(x, 1).normalized * force;
+                lockedOnWall = false;
+            }
+            else
+            {
+                velocity.y = velocity.y > 0 ? velocity.y + force : force;
+            }
+        }
+    }
+
+    public void ProcessEndJump()
+    {
+        if (!grappling && jumped)
+        {
+            velocity.y *= velocity.y > 0 ? 0.5f : 1; new NotImplementedException();
+        }
+    }
+
+    public void ProcessBeginGrapple()
+    {
+        if (grappleCooldown <= 0)
+        {
+            lockedOnWall = false;
+            grappleCooldown = 0.25f;
+            RaycastHit2D hit = Physics2D.Raycast(transform.position + (new Vector3(facingRight ? 1 : -1, 1, 0)), new Vector2(facingRight ? 1 : -1, 1));
+            if (hit.collider != null && hit.collider.gameObject.layer == LayerMask.NameToLayer("Grapple"))
+            {
+                drawLine(transform.position, hit.point, Color.green, Color.green, 5);
+                grappling = true;
+                grappleCenter = hit.point;
+                grappleVelocity = velocity.magnitude;
+                Vector3 perp = Vector3.Cross(grappleCenter - transform.position, Vector3.forward) * (facingRight ? 1 : -1);
+                transform.rotation = Quaternion.Euler(new Vector3(0, 0, MathF.Atan2(perp.x, perp.y)));
+
+            }
+            else if (hit.collider != null && hit.collider.gameObject.layer != LayerMask.NameToLayer("Grapple"))
+            {
+                drawLine(transform.position, hit.point, Color.yellow, Color.yellow, 5);
+            }
+            else
+            {
+                drawLine(transform.position, transform.position + new Vector3(facingRight ? 1 : -1, 1, 0) * 1000, Color.red, Color.red, 5);
+            }
+        }
+    }
+
+    public void ProcessEndGrapple()
+    {
+        if (grappling)
+        {
+            grappling = false;
+            jumped = false;
+            jumpsRemaining = math.max(jumpsRemaining, 1);
+            velocity = (RotateAround(grappleCenter, transform.position, facingRight ? -90 : 90) - transform.position).normalized * grappleVelocity;
+        }
+    }
+
+    public void ProcessBeginLeft()
+    {
+        movingLeft = true;
+    }
+
+    public void ProcessEndLeft()
+    {
+        movingLeft = false;
+    }
+
+    public void ProcessBeginRight()
+    {
+        movingRight = true;
+    }
+
+    public void ProcessEndRight()
+    {
+        movingRight = false;
     }
 }
