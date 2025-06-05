@@ -4,8 +4,8 @@ using UnityEngine;
 [System.Serializable]
 public struct Controls
 {
-    public KeyCodeVariable left;
-    public KeyCodeVariable right;
-    public KeyCodeVariable jump;
-    public KeyCodeVariable grapple;
+    public KeyCode left;
+    public KeyCode right;
+    public KeyCode jump;
+    public KeyCode grapple;
 }

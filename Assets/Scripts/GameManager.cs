@@ -5,7 +5,7 @@ using System.Threading;
 using TMPro;
 using UnityEngine;
 
-public class GameManager : MonoBehaviour
+public class GameManager : MonoBehaviour, ISubject<(int, int, KeyCode)>
 {
     float runTimer = 0;
     [SerializeField] private BoolVariable paused;
@@ -50,13 +50,21 @@ public class GameManager : MonoBehaviour
     {
         pauseButton.value = (KeyCode)Enum.Parse(typeof(KeyCode), PlayerPrefs.GetString("Pause", KeyCode.Escape.ToString()));
         left1.value = (KeyCode)Enum.Parse(typeof(KeyCode), PlayerPrefs.GetString("Left1", KeyCode.LeftArrow.ToString()));
+        Publish((0, 0, left1.value));
         left2.value = (KeyCode)Enum.Parse(typeof(KeyCode), PlayerPrefs.GetString("Left2", KeyCode.A.ToString()));
+        Publish((1, 0, left2.value));
         right1.value = (KeyCode)Enum.Parse(typeof(KeyCode), PlayerPrefs.GetString("Right1", KeyCode.RightArrow.ToString()));
+        Publish((0, 1, right1.value));
         right2.value = (KeyCode)Enum.Parse(typeof(KeyCode), PlayerPrefs.GetString("Right2", KeyCode.D.ToString()));
+        Publish((1, 1, right2.value));
         jump1.value = (KeyCode)Enum.Parse(typeof(KeyCode), PlayerPrefs.GetString("Jump1", KeyCode.Space.ToString()));
+        Publish((0, 2, jump1.value));
         jump2.value = (KeyCode)Enum.Parse(typeof(KeyCode), PlayerPrefs.GetString("Jump2", KeyCode.W.ToString()));
+        Publish((1, 2, jump2.value));
         grapple1.value = (KeyCode)Enum.Parse(typeof(KeyCode), PlayerPrefs.GetString("Grapple1", KeyCode.C.ToString()));
+        Publish((0, 3, grapple1.value));
         grapple2.value = (KeyCode)Enum.Parse(typeof(KeyCode), PlayerPrefs.GetString("Grapple2", KeyCode.J.ToString()));
+        Publish((1, 3, grapple2.value));
         generateEvent.Subscribe(generateSection);
         dieEvent.Subscribe(onDeath);
     }
@@ -90,6 +98,7 @@ public class GameManager : MonoBehaviour
         }
         else if (controlToUpdate != -1)
         {
+
             foreach (KeyCode keyCode in Enum.GetValues(typeof(KeyCode)))
             {
                 if (Input.GetKeyDown(keyCode))
@@ -142,6 +151,7 @@ public class GameManager : MonoBehaviour
                             updateGrapple2.text = keyCode.ToString();
                             break;
                     }
+                    Publish(((controlToUpdate - 1) / 4, (controlToUpdate - 1) % 4, keyCode));
                     controlToUpdate = -1;
                     break;
                 }
@@ -293,5 +303,28 @@ public class GameManager : MonoBehaviour
     {
         controlToUpdate = 8;
         updateGrapple2.text = "Press any key";
+    }
+
+    private List<IObserver<(int, int, KeyCode)>> observers = new();
+
+    public void Subscribe(IObserver<(int, int, KeyCode)> observer)
+    {
+        if(!observers.Contains(observer))
+        {
+            observers.Add(observer);
+        }
+    }
+
+    public void Unsubscribe(IObserver<(int, int, KeyCode)> observer)
+    {
+        observers.Remove(observer);
+    }
+
+    public void Publish((int, int, KeyCode) value)
+    {
+        foreach(IObserver<(int, int, KeyCode)> observer in observers)
+        {
+            observer.Observe(value);
+        }
     }
 }
