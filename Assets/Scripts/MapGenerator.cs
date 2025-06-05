@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
 
-public class MapGenerator : MonoBehaviour
+public class MapGenerator : Singleton<MapGenerator>
 {
     [SerializeField] private GameObject[] start5, start7, start9, start11;
     private GameObject[][] mapPieces = new GameObject[4][];

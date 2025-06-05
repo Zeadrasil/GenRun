@@ -139906,6 +139906,7 @@ GameObject:
   - component: {fileID: 1732575055}
   - component: {fileID: 1732575058}
   - component: {fileID: 1732575057}
+  - component: {fileID: 1732575059}
   m_Layer: 0
   m_Name: Grid
   m_TagString: Untagged
@@ -140025,6 +140026,23 @@ MonoBehaviour:
   right2: {fileID: 11400000, guid: 8c8bacfdc6a7fc2459b4888e23b5f519, type: 2}
   jump2: {fileID: 11400000, guid: 4f5cb681af2ae824fb1742f2ce740c51, type: 2}
   grapple2: {fileID: 11400000, guid: 757ac2c5ee1d3054a91030771696d66f, type: 2}
+--- !u!114 &1732575059
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1732575054}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0cb7088df66738744bb8a841d83dbcf9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  playerControls:
+  - left: {fileID: 11400000, guid: 52d1d50d550b6f44488309b379b0eb39, type: 2}
+    right: {fileID: 11400000, guid: 31bc984e43310f546a508dce662e318c, type: 2}
+    jump: {fileID: 11400000, guid: 1737daea8566214418d47f19fc450635, type: 2}
+    grapple: {fileID: 11400000, guid: 1a813089d78636e44ad92f733c3aa7eb, type: 2}
 --- !u!1 &1736202597
 GameObject:
   m_ObjectHideFlags: 3
@@ -142362,11 +142380,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 371716f32368ddd49baab4654e4bb060, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  left: {fileID: 11400000, guid: 52d1d50d550b6f44488309b379b0eb39, type: 2}
-  right: {fileID: 11400000, guid: 31bc984e43310f546a508dce662e318c, type: 2}
-  jump: {fileID: 11400000, guid: 1737daea8566214418d47f19fc450635, type: 2}
-  grapple: {fileID: 11400000, guid: 1a813089d78636e44ad92f733c3aa7eb, type: 2}
   resetEvent: {fileID: 11400000, guid: 296079f6b676b014fa2a8e63c16eb6a5, type: 2}
+  playerID: 0
   paused: {fileID: 11400000, guid: f0164c013ceb08a498009239e6a75fc9, type: 2}
   notInMenus: {fileID: 11400000, guid: ae69a2556297b164a85c6cb542fa3b80, type: 2}
   width: 0.5
