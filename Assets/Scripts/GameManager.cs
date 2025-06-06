@@ -76,7 +76,7 @@ public class GameManager : MonoBehaviour, ISubject<(int, int, KeyCode)>
             if (!paused && active)
             {
                 runTimer -= Time.deltaTime;
-                remainingTime.text = (Mathf.Round(runTimer * 100) * 0.01f).ToString();
+                remainingTime.text = $"{(runTimer):F2}";
                 if (runTimer < 0)
                 {
                     dieEvent.RaiseEvent();

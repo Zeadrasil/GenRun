@@ -23,7 +23,6 @@ public class InputManager : Singleton<InputManager>, IObserver<(int, int, KeyCod
             movement[i] = 0;
             movement[i] += Input.GetKey(playerControls[i].right) ? 1 : 0;
             movement[i] -= Input.GetKey(playerControls[i].left) ? 1 : 0;
-            Debug.Log(movement[i]);
         }
     }
     private void Start()

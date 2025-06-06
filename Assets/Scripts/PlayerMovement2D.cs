@@ -1,12 +1,6 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using Unity.Burst.CompilerServices;
 using Unity.Mathematics;
-using Unity.VisualScripting;
-using UnityEditor.Experimental.GraphView;
 using UnityEngine;
-using static UnityEngine.RuleTile.TilingRuleOutput;
 public class PlayerMovement2D : MonoBehaviour, IMovable
 {
     [SerializeField] private VoidEvent resetEvent;
@@ -23,7 +17,6 @@ public class PlayerMovement2D : MonoBehaviour, IMovable
     [SerializeField] BoolVariable notInMenus;
     [SerializeField] float width = 0.5f;
     bool jumped = false;
-    bool lockedOnWall = false;
     bool movingRight = false;
     bool movingLeft = false;
     // Start is called before the first frame update
@@ -38,7 +31,7 @@ public class PlayerMovement2D : MonoBehaviour, IMovable
         {
             grappleCooldown -= Time.deltaTime;
             
-            if(onGround())
+            if(onGround() || OnWall())
             {
                 jumpsRemaining = 2;
                 coyoteJump = 0;
@@ -55,10 +48,25 @@ public class PlayerMovement2D : MonoBehaviour, IMovable
                 }
             }
             float modifier = 10 / (MathF.Abs(velocity.x) + 0.1f);
-            if((movingLeft ^ movingRight) && !lockedOnWall)
+
+            if((movingLeft ^ movingRight))
             {
-                velocity.x += 10 * modifier * Time.deltaTime * (movingRight ? 1 : -1);
                 facingRight = movingRight;
+                //Debug.DrawLine(transform.position, new Vector3(transform.position.x, transform.position.y - width * 1.5f), Color.red, 1);
+                //Debug.DrawLine(new Vector3(transform.position.x + width * (facingRight ? 0.5f : -0.5f), transform.position.y), new Vector3(transform.position.x + width * (facingRight ? 0.5f : -0.5f), transform.position.y - width * 2.25f), Color.red, 1);
+                Vector3 addedVelocity = Vector3.zero;
+                RaycastHit2D hit1 = Physics2D.Raycast(transform.position, Vector2.down, width * 1.5f, LayerMask.GetMask("Ground"));
+                RaycastHit2D hit2 = Physics2D.Raycast(transform.position + new Vector3(width * (facingRight ? 1 : -1), 0), Vector2.down, width * 3, LayerMask.GetMask("Ground"));
+                if (hit1 && hit2)
+                {
+                    addedVelocity = (hit2.point - hit1.point).normalized * 10 * modifier * Time.deltaTime;
+                    addedVelocity.y *= 2.5f;
+                }
+                else
+                {
+                    addedVelocity = new Vector3(10 * modifier * Time.deltaTime * (movingRight ? 1 : -1), 0);
+                }
+                velocity += addedVelocity;
             }
 
             float rate = onGround() ? 0.75f : 0.5f;
@@ -68,31 +76,19 @@ public class PlayerMovement2D : MonoBehaviour, IMovable
             velocity.x -= velocity.x > 0 ? ((velocity.x + 10) * rate * Time.deltaTime) - 10 * rate * Time.deltaTime : ((velocity.x - 10) * rate * Time.deltaTime) + 10 * rate * Time.deltaTime;
             RunMovement(velocity.magnitude * Time.deltaTime);
             lastPosition = transform.position;
+            Debug.Log(jumpsRemaining);
         }
     }
 
     private bool onGround()
     {
-        return Physics2D.RaycastAll(transform.position, new Vector2(0, -1), 0.6f, LayerMask.GetMask("Ground")).Length > 0 || OnWall() != 0;
+        return Physics2D.RaycastAll(transform.position, new Vector2(0, -1), 0.6f, LayerMask.GetMask("Ground")).Length > 0 || Physics2D.RaycastAll(new Vector3(transform.position.x - width, transform.position.y), new Vector2(0, -1), 0.6f, LayerMask.GetMask("Ground")).Length > 0 || Physics2D.RaycastAll(new Vector3(transform.position.x + width, transform.position.y), new Vector2(0, -1), 0.6f, LayerMask.GetMask("Ground")).Length > 0;
     }
 
-    private int OnWall()
+    private bool OnWall()
     {
-        int result = 0;
-        result = Physics2D.Raycast(transform.position + new Vector3(0, width), new Vector3(1, 0), width + 0.01f, LayerMask.GetMask("WallJump")) ? 1 : 0;
-        if(result == 0)
-        {
-            result = Physics2D.Raycast(transform.position + new Vector3(0, width), new Vector3(-1, 0), width + 0.01f, LayerMask.GetMask("WallJump")) ? 3 : 0;
-            if(result == 0)
-            {
-                result = Physics2D.Raycast(transform.position + new Vector3(0, -width), new Vector3(1, 0), width + 0.01f, LayerMask.GetMask("WallJump")) ? 2 : 0;
-                if (result == 0)
-                {
-                    result = Physics2D.Raycast(transform.position + new Vector3(0, -width), new Vector3(-1, 0), width + 0.01f, LayerMask.GetMask("WallJump")) ? 4 : 0;
-                }
-            }
-        }
-        return result;
+        //Debug.DrawLine(new Vector2(transform.position.x - width * 1.5f, transform.position.y), new Vector2(transform.position.x + width * 1.5f, transform.position.y), Color.red);
+        return Physics2D.OverlapCircleAll(transform.position, width * 1.5f, LayerMask.GetMask("WallClimb")).Length > 0;
     }
 
     private void resetToStart()
@@ -101,7 +97,6 @@ public class PlayerMovement2D : MonoBehaviour, IMovable
         transform.rotation = Quaternion.identity;
         grappling = false;
         facingRight = true;
-        lockedOnWall = false;
         velocity = Vector3.zero;
     }
     private void drawLine(Vector3 start, Vector3 end, Color startColor, Color endColor, float duration = 0.005f, float width = 0.1f)
@@ -120,34 +115,12 @@ public class PlayerMovement2D : MonoBehaviour, IMovable
         Destroy(gameObj, duration);
     }
 
-    private void RunCollision(RaycastHit2D hit, float additionalMovement)
+    private void RunMovement(float movement, Vector2 direction = new Vector2())
     {
-        if(hit.normal.x != 0)
+        if(direction.magnitude == 0)
         {
-            velocity.x *= -0.9f;
+            direction = velocity;
         }
-        else
-        {
-            velocity.y *= -0.1f;
-        }
-        if (hit.collider.gameObject.layer == LayerMask.NameToLayer("WallClimb"))
-        {
-            if(velocity.y > 0)
-            {
-                velocity.y += math.abs(velocity.x) * 0.1f;
-            }
-            else
-            {
-                velocity.y -= math.abs(velocity.x) * 0.1f;
-            }
-            velocity.x = 0;
-            lockedOnWall = true;
-        }
-        RunMovement(additionalMovement);
-    }
-
-    private void RunMovement(float movement)
-    {
         if (grappling)
         {
             Vector3 nextPosition = RotateAround(transform.position, grappleCenter, grappleVelocity * (facingRight ? 1 : -1) * Time.deltaTime * (360 / (2 * Mathf.PI * Vector3.Distance(transform.position, grappleCenter))));
@@ -160,7 +133,21 @@ public class PlayerMovement2D : MonoBehaviour, IMovable
                 jumpsRemaining = 1;
                 velocity = (RotateAround(grappleCenter, transform.position, facingRight ? -90 : 90) - transform.position).normalized * grappleVelocity;
                 transform.position += (nextPosition - transform.position).normalized * (hit.distance - width);
-                RunCollision(hit, distance - hit.distance + width);
+                Vector3 AMovement = Quaternion.AngleAxis(90, new Vector3(0, 0, 1)) * hit.normal.normalized;
+                Vector3 BMovement = Quaternion.AngleAxis(-90, new Vector3(0, 0, 1)) * hit.normal.normalized;
+                float ADot = Vector3.Dot(direction.normalized, AMovement);
+                float BDot = Vector3.Dot(direction.normalized, BMovement);
+                if (ADot > BDot)
+                {
+                    velocity = AMovement * (movement - hit.distance + 0.01f) * ADot;
+                    RunMovement((movement - hit.distance + 0.01f) * ADot, AMovement);
+                }
+                else
+                {
+                    velocity = BMovement * (movement - hit.distance + 0.01f) * BDot;
+                    RunMovement((movement - hit.distance + 0.01f) * BDot, BMovement);
+                }
+                
             }
             else
             {
@@ -172,11 +159,27 @@ public class PlayerMovement2D : MonoBehaviour, IMovable
         }
         else
         {
-            RaycastHit2D hit = Physics2D.CircleCast(transform.position, width, velocity.normalized, movement, LayerMask.GetMask("Ground", "WallClimb", "Grapple"));
+            RaycastHit2D hit = Physics2D.CircleCast(transform.position, width, direction.normalized, movement, LayerMask.GetMask("Ground", "WallClimb", "Grapple"));
             if (hit)
             {
-                transform.position += velocity.normalized * (hit.distance - width);
-                RunCollision(hit, movement - hit.distance + width);
+                transform.position += new Vector3(direction.x, direction.y).normalized * (hit.distance - 0.01f);
+                if (hit.distance > 0.01f)
+                {
+                    Vector3 AMovement = Quaternion.AngleAxis(90, new Vector3(0, 0, 1)) * hit.normal.normalized;
+                    Vector3 BMovement = Quaternion.AngleAxis(-90, new Vector3(0, 0, 1)) * hit.normal.normalized;
+                    float ADot = Vector3.Dot(direction.normalized, AMovement);
+                    float BDot = Vector3.Dot(direction.normalized, BMovement);
+                    if (ADot > BDot)
+                    {
+                        velocity = AMovement * (movement - hit.distance + 0.01f) * ADot;
+                        RunMovement((movement - hit.distance + 0.01f) * ADot, AMovement);
+                    }
+                    else
+                    {
+                        velocity = BMovement * (movement - hit.distance + 0.01f) * BDot;
+                        RunMovement((movement - hit.distance + 0.01f) * BDot, BMovement);
+                    }
+                }
             }
             else
             {
@@ -196,21 +199,11 @@ public class PlayerMovement2D : MonoBehaviour, IMovable
 
     public void ProcessBeginJump()
     {
-        if (jumpsRemaining > 0)
+        if (jumpsRemaining > 0 && !grappling)
         {
             jumpsRemaining--;
             float force = jumpsRemaining == 0 ? 10 : 15;
-            if (lockedOnWall)
-            {
-                float x = OnWall() < 3 ? 1 : -1;
-                velocity.y = math.max(velocity.y, 0);
-                velocity += new Vector3(x, 1).normalized * force;
-                lockedOnWall = false;
-            }
-            else
-            {
-                velocity.y = velocity.y > 0 ? velocity.y + force : force;
-            }
+            velocity.y = velocity.y > 0 ? velocity.y + force : force;
         }
     }
 
@@ -226,7 +219,6 @@ public class PlayerMovement2D : MonoBehaviour, IMovable
     {
         if (grappleCooldown <= 0)
         {
-            lockedOnWall = false;
             grappleCooldown = 0.25f;
             RaycastHit2D hit = Physics2D.Raycast(transform.position + (new Vector3(facingRight ? 1 : -1, 1, 0)), new Vector2(facingRight ? 1 : -1, 1));
             if (hit.collider != null && hit.collider.gameObject.layer == LayerMask.NameToLayer("Grapple"))
@@ -280,4 +272,5 @@ public class PlayerMovement2D : MonoBehaviour, IMovable
     {
         movingRight = false;
     }
+
 }
